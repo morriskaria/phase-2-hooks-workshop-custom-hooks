@@ -1,81 +1,53 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from 'react';
 
-/* 
-  the two parameters for this function are: 
-  - key: the key on localStorage where we are saving this data
-  - initialValue: the initial value of state
-*/
-export function useLocalStorage(key, initialValue) {
-  /* 
-    ✅ in this hook, use the useState hook. For the initial value for state:
-    use the value saved in localStorage OR the initialValue from the function parameters 
-  */
-
-  /* 
-   ✅ write a useEffect hook 
-   in the useEffect, when state is updated, save the state to localStorage
-   don't forget the dependencies array!
-  */
-  useEffect(() => {});
-
-  /* 
-   ✅ return the same interface as useState:
-   an array with state and a setState function
-  */
-  // 👀 return [state, setState]
-}
-
-function Form() {
-  // ✅ after implementing the useLocalStorage hook, replace useState with useLocalStorage
-  // don't forget to pass in both arguments (a key and an initialValue)
-  const [name, setName] = useState("");
-  console.log(name);
-
-  return (
-    <form style={{ display: "flex", flexDirection: "column" }}>
-      <label htmlFor="name">Name:</label>
-      <input type="text" value={name} onChange={e => setName(e.target.value)} />
-      <h4>{name ? `Welcome, ${name}!` : "Enter your name"}</h4>
-    </form>
-  );
-}
-
-function FormWithObject() {
-  // 🤓 save me for the bonus! when you're ready, update this useState to use your useLocalStorage hook instead
-  const [formData, setFormData] = useState({
-    title: "",
-    content: "",
+export function useLocalStorage(key, initialValue = null) {
+  // Initialize state with value from localStorage or initialValue
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      const item = localStorage.getItem(key);
+      // Return parsed item if it exists, otherwise return initialValue
+      return item !== null ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error('Error reading localStorage:', error);
+      return initialValue;
+    }
   });
 
-  function handleChange(e) {
-    setFormData(formData => ({
-      ...formData,
-      [e.target.name]: e.target.value,
-    }));
-  }
+  // Update localStorage when state changes
+  const setValue = (value) => {
+    try {
+      // Allow value to be a function (like useState)
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      // Update state
+      setStoredValue(valueToStore);
+      // Save to localStorage
+      localStorage.setItem(key, JSON.stringify(valueToStore));
+    } catch (error) {
+      console.error('Error writing to localStorage:', error);
+    }
+  };
 
-  return (
-    <form style={{ display: "flex", flexDirection: "column" }}>
-      <label htmlFor="name">Title:</label>
-      <input name="title" value={formData.title} onChange={handleChange} />
-      <label htmlFor="name">Content:</label>
-      <textarea
-        name="content"
-        value={formData.content}
-        onChange={handleChange}
-      />
-    </form>
-  );
-}
+  // Handle storage events from other tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      // Only update if the changed key matches our key
+      if (e.key === key) {
+        try {
+          const newValue = e.newValue !== null ? JSON.parse(e.newValue) : null;
+          setStoredValue(newValue);
+        } catch (error) {
+          console.error('Error parsing storage event value:', error);
+          setStoredValue(initialValue);
+        }
+      }
+    };
 
-export default function App() {
-  return (
-    <div>
-      <h2>useLocalStorage can save string</h2>
-      <Form />
-      <hr />
-      <h2>useLocalStorage can save objects (Bonus)</h2>
-      <FormWithObject />
-    </div>
-  );
+    // Add event listener
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Cleanup: remove event listener
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [key, initialValue]); // Dependencies ensure proper cleanup
+
+  return [storedValue, setValue];
 }
